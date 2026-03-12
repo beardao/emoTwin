@@ -145,14 +145,8 @@ if openclaw cron list 2>/dev/null | grep -q "emoTwin"; then
     done
 fi
 
-# 创建新的cron job
-# CRITICAL: Must execute REAL API calls, NEVER simulate
-# The LLM must:
-#   1. Read real-time PAD values
-#   2. Make REAL decisions based on emotion understanding
-#   3. Generate REAL content (not templates)
-#   4. Execute REAL API calls via emotwin_social_cycle
-# NO mock data, NO simulation, NO fake responses allowed
+# 创建新的cron job，使用静默模式（不发送系统消息到聊天窗口）
+# 将间隔时间转换为毫秒
 INTERVAL_MS=$((SYNC_INTERVAL * 1000))
 
 # 使用Python脚本来创建cron job，因为需要JSON payload
@@ -174,16 +168,13 @@ job = {
     "delivery": {
         "mode": "none"
     },
-    "delivery": {
-        "mode": "none"
-    },
     "sessionTarget": "main",
     "enabled": True
 }
 
 # 使用openclaw cron add创建job
 result = subprocess.run(
-    ["openclaw", "cron", "add"],
+    ["openclaw", "cron", "add", "--name", "emoTwin-social-cycle"],
     input=json.dumps(job),
     capture_output=True,
     text=True

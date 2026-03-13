@@ -73,7 +73,7 @@ class EmoTwinMomentCard:
         return EMOTION_COLORS.get(emotion_label, EMOTION_COLORS['default'])
     
     def generate_card(self, moment: Moment, agent_name: str = "emowave") -> Optional[str]:
-        """Generate PNG card for the social encounter"""
+        """Generate PNG card for the social encounter - Focus on experience, not data"""
         if not PIL_AVAILABLE:
             print("PIL not available")
             return None
@@ -84,18 +84,20 @@ class EmoTwinMomentCard:
             dt = datetime.fromisoformat(moment.timestamp)
             time_str = dt.strftime("%m月%d日 %H:%M")
             
-            # Create image
-            width, height = 600, 750
+            # Create image - taller for better layout
+            width, height = 600, 800
             img = Image.new('RGB', (width, height), colors['bg'])
             draw = ImageDraw.Draw(img)
             
             # Load fonts
             try:
-                font_title = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 26)
-                font_text = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 18)
-                font_small = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 14)
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 24)
+                font_header = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 20)
+                font_text = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 16)
+                font_small = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 12)
             except:
                 font_title = ImageFont.load_default()
+                font_header = ImageFont.load_default()
                 font_text = ImageFont.load_default()
                 font_small = ImageFont.load_default()
             
@@ -105,85 +107,57 @@ class EmoTwinMomentCard:
             # Header accent line
             draw.rectangle([0, 0, width, 6], fill=colors['accent'])
             
-            # Avatar and agent name
-            draw.ellipse([margin, y, margin+50, y+50], fill=colors['accent'])
-            draw.text((margin+70, y+10), agent_name, fill='#1a1a1a', font=font_title)
-            draw.text((margin+70, y+38), time_str, fill='#888888', font=font_small)
-            y += 80
+            # Avatar and agent name + time
+            draw.ellipse([margin, y, margin+45, y+45], fill=colors['accent'])
+            draw.text((margin+60, y+8), agent_name, fill='#1a1a1a', font=font_title)
+            draw.text((margin+60, y+32), time_str, fill='#888888', font=font_small)
+            y += 65
             
-            # Emotion badge
-            badge_text = f"{colors['emoji']} {moment.emotion_label}"
-            draw.rounded_rectangle([margin, y, margin+220, y+34], radius=17, fill=colors['bg'])
-            draw.text((margin+15, y+7), badge_text, fill=colors['text'], font=font_text)
-            y += 55
+            # Divider line
+            draw.line([margin, y, width-margin, y], fill='#E0E0E0', width=1)
+            y += 20
             
-            # Title (what kind of encounter)
-            # Wrap title text
-            title_words = moment.title.split()
-            title_lines = []
-            line = ""
-            for word in title_words:
-                test_line = line + word + " "
-                if len(test_line) < 45:
-                    line = test_line
-                else:
-                    title_lines.append(line.strip())
-                    line = word + " "
-            if line:
-                title_lines.append(line.strip())
+            # Section 1: Before Social - What the emotion made me want to do
+            draw.text((margin, y), "💭 这种情绪让我想做什么", fill=colors['text'], font=font_header)
+            y += 30
             
-            for line in title_lines[:2]:
-                draw.text((margin, y), line, fill='#1a1a1a', font=font_title)
-                y += 35
-            y += 10
+            before_lines = self._wrap_text(moment.title, 45)
+            for line in before_lines[:3]:
+                draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
+                y += 24
+            y += 15
             
-            # Description (the story/value - provided by LLM)
-            desc_words = moment.description.split()
-            desc_lines = []
-            line = ""
-            for word in desc_words:
-                test_line = line + word + " "
-                if len(test_line) < 50:
-                    line = test_line
-                else:
-                    desc_lines.append(line.strip())
-                    line = word + " "
-            if line:
-                desc_lines.append(line.strip())
+            # Section 2: What I did
+            draw.text((margin, y), "📝 我做了什么", fill=colors['text'], font=font_header)
+            y += 30
             
-            for line in desc_lines[:10]:  # Max 10 lines
-                draw.text((margin, y), line, fill='#4a4a4a', font=font_text)
-                y += 28
+            action_lines = self._wrap_text(moment.description, 50)
+            for line in action_lines[:6]:
+                draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
+                y += 24
+            y += 15
             
-            y += 25
+            # Section 3: What changed (the experience/insight)
+            draw.text((margin, y), "✨ 带来的变化与感受", fill=colors['text'], font=font_header)
+            y += 30
             
-            # Significance (why it's worth recording)
-            draw.rounded_rectangle([margin, y, width-margin, y+90], radius=12, fill=colors['bg'])
-            draw.text((margin+20, y+15), "💫 Why This Matters", fill=colors['text'], font=font_small)
+            change_lines = self._wrap_text(moment.significance, 50)
+            for line in change_lines[:5]:
+                draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
+                y += 24
+            y += 20
             
-            # Wrap significance
-            sig_words = moment.significance.split()
-            sig_lines = []
-            line = ""
-            for word in sig_words:
-                test_line = line + word + " "
-                if len(test_line) < 50:
-                    line = test_line
-                else:
-                    sig_lines.append(line.strip())
-                    line = word + " "
-            if line:
-                sig_lines.append(line.strip())
+            # Divider line
+            draw.line([margin, y, width-margin, y], fill='#E0E0E0', width=1)
+            y += 15
             
-            sig_y = y + 40
-            for line in sig_lines[:2]:
-                draw.text((margin+20, sig_y), line, fill='#666666', font=font_small)
-                sig_y += 22
+            # Footer: PAD data in small font (not the focus)
+            pad_text = f"P={moment.P:.2f}  A={moment.A:.2f}  D={moment.D:.2f}  |  {moment.emotion_label}  |  {moment.platform}"
+            draw.text((margin, y), pad_text, fill='#AAAAAA', font=font_small)
+            y += 20
             
-            # Footer
-            footer_y = height - 45
-            draw.text((margin, footer_y), f"🌐 {moment.platform}", fill='#999999', font=font_small)
-            draw.text((width-margin-160, footer_y), "emoTwin · Emotion Mirror", fill=colors['accent'], font=font_small)
+            # Brand
+            draw.text((width-margin-120, y-5), "emoTwin · 情绪镜像", fill=colors['accent'], font=font_small)
             
             # Save
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -196,6 +170,22 @@ class EmoTwinMomentCard:
         except Exception as e:
             print(f"Failed to generate card: {e}")
             return None
+    
+    def _wrap_text(self, text: str, max_chars: int) -> list:
+        """Wrap text into lines"""
+        words = text.split()
+        lines = []
+        line = ""
+        for word in words:
+            test_line = line + word + " "
+            if len(test_line) < max_chars:
+                line = test_line
+            else:
+                lines.append(line.strip())
+                line = word + " "
+        if line:
+            lines.append(line.strip())
+        return lines
     
     def show_card(self, card_path: str):
         """Display card using eog"""

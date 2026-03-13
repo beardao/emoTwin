@@ -85,16 +85,16 @@ class EmoTwinMomentCard:
             time_str = dt.strftime("%m月%d日 %H:%M")
             
             # Create image - taller for better layout
-            width, height = 600, 800
+            width, height = 600, 900
             img = Image.new('RGB', (width, height), colors['bg'])
             draw = ImageDraw.Draw(img)
             
-            # Load fonts
+            # Load fonts - slightly smaller to fit more content
             try:
-                font_title = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 24)
-                font_header = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 20)
-                font_text = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 16)
-                font_small = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 12)
+                font_title = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 22)
+                font_header = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", 18)
+                font_text = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 14)
+                font_small = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 11)
             except:
                 font_title = ImageFont.load_default()
                 font_header = ImageFont.load_default()
@@ -117,35 +117,54 @@ class EmoTwinMomentCard:
             draw.line([margin, y, width-margin, y], fill='#E0E0E0', width=1)
             y += 20
             
+            # Calculate content height first
+            max_text_width = width - margin * 2 - 20  # Account for margins and padding
+            before_lines = self._wrap_text(moment.title, max_text_width, font_text)
+            action_lines = self._wrap_text(moment.description, max_text_width, font_text)
+            change_lines = self._wrap_text(moment.significance, max_text_width, font_text)
+            
+            # Calculate required height
+            content_height = 28 + len(before_lines[:6]) * 20  # Section 1
+            content_height += 28 + len(action_lines[:12]) * 20  # Section 2
+            content_height += 28 + len(change_lines[:10]) * 20  # Section 3
+            content_height += 60  # Padding and footer
+            
+            # Adjust image height if needed (min 900, max 1400)
+            required_height = y + content_height + 100
+            if required_height > height:
+                # Create new larger image
+                new_height = min(required_height, 1400)
+                new_img = Image.new('RGB', (width, new_height), colors['bg'])
+                new_img.paste(img, (0, 0))
+                img = new_img
+                draw = ImageDraw.Draw(img)
+            
             # Section 1: Before Social - What the emotion made me want to do
             draw.text((margin, y), "💭 这种情绪让我想做什么", fill=colors['text'], font=font_header)
-            y += 30
+            y += 26
             
-            before_lines = self._wrap_text(moment.title, 45)
-            for line in before_lines[:3]:
+            for line in before_lines[:6]:
                 draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
-                y += 24
-            y += 15
+                y += 20
+            y += 10
             
             # Section 2: What I did
             draw.text((margin, y), "📝 我做了什么", fill=colors['text'], font=font_header)
-            y += 30
+            y += 26
             
-            action_lines = self._wrap_text(moment.description, 50)
-            for line in action_lines[:6]:
+            for line in action_lines[:12]:
                 draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
-                y += 24
-            y += 15
+                y += 20
+            y += 10
             
             # Section 3: What changed (the experience/insight)
             draw.text((margin, y), "✨ 带来的变化与感受", fill=colors['text'], font=font_header)
-            y += 30
+            y += 26
             
-            change_lines = self._wrap_text(moment.significance, 50)
-            for line in change_lines[:5]:
+            for line in change_lines[:10]:
                 draw.text((margin+10, y), line, fill='#4a4a4a', font=font_text)
-                y += 24
-            y += 20
+                y += 20
+            y += 16
             
             # Divider line
             draw.line([margin, y, width-margin, y], fill='#E0E0E0', width=1)
@@ -171,20 +190,30 @@ class EmoTwinMomentCard:
             print(f"Failed to generate card: {e}")
             return None
     
-    def _wrap_text(self, text: str, max_chars: int) -> list:
-        """Wrap text into lines"""
-        words = text.split()
+    def _wrap_text(self, text: str, max_width: int, font) -> list:
+        """Wrap text into lines based on actual pixel width"""
         lines = []
-        line = ""
-        for word in words:
-            test_line = line + word + " "
-            if len(test_line) < max_chars:
-                line = test_line
+        current_line = ""
+        
+        for char in text:
+            test_line = current_line + char
+            # Use textlength if available (PIL >= 8.0), fallback to approx calculation
+            try:
+                line_width = font.getlength(test_line)
+            except:
+                # Fallback: approximate width (Chinese chars ~14px, ASCII ~7px)
+                line_width = sum(14 if ord(c) > 127 else 7 for c in test_line)
+            
+            if line_width <= max_width:
+                current_line = test_line
             else:
-                lines.append(line.strip())
-                line = word + " "
-        if line:
-            lines.append(line.strip())
+                if current_line:
+                    lines.append(current_line)
+                current_line = char
+        
+        if current_line:
+            lines.append(current_line)
+        
         return lines
     
     def show_card(self, card_path: str):

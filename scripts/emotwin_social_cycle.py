@@ -142,6 +142,27 @@ def get_recent_posts(limit=5):
         print(f"❌ Failed to get posts: {e}")
         return []
 
+def get_available_submolts():
+    """Get list of available submolts for LLM to choose from"""
+    try:
+        import requests
+        resp = requests.get('https://www.moltbook.cn/api/v1/submolts', 
+                          headers={'Authorization': f'Bearer {os.environ.get("MOLTCN_TOKEN", "")}'})
+        if resp.status_code == 200:
+            data = resp.json()
+            submolts = []
+            for sub in data.get('data', []):
+                submolts.append({
+                    'name': sub['name'],
+                    'display_name': sub.get('display_name', sub['name']),
+                    'description': sub.get('description', '无描述')[:100]  # Truncate long descriptions
+                })
+            return submolts
+        return []
+    except Exception as e:
+        print(f"❌ Failed to get submolts: {e}")
+        return []
+
 # CRITICAL: This script MUST execute REAL API calls, NEVER simulate
 # All functions in this file perform actual Moltcn/Moltbook API operations
 # There are NO simulation or demo code paths
